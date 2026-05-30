@@ -1,6 +1,53 @@
 # Pricevana
 
-Pricevana is a smart price tracking and product discovery web application. It is decoupled into a static frontend and a Python REST API backend.
+Pricevana is an intelligent price tracking and product discovery web application that helps shoppers make strategic buying decisions. By analyzing historical price trends, predicting future price drops using machine learning, and scanning for active discount coupons, Pricevana optimizes checkout timing to maximize user savings.
+
+---
+
+## Technical Architecture
+
+Pricevana is built as a decoupled, two-tier web application to ensure portability and high performance:
+
+1. **Frontend (Presentation Layer)**:
+   - Pure static client-side bundle built with HTML5, Vanilla CSS, and modular ES6 Javascript.
+   - Utilizes custom responsive styles, modern typography, glassmorphic card overlays, and dynamic conic-gradient needle gauges to deliver an engaging dashboard interface.
+   - Auto-detects local vs production environments to direct HTTP requests dynamically.
+
+2. **Backend (Application & Analytics Layer)**:
+   - Python Flask REST API backend providing CORS-enabled JSON endpoints.
+   - Integrates a lightweight HTML meta-parser to extract OpenGraph (`og:image`) and Twitter product photos in under 50 milliseconds.
+   - Incorporates a machine learning model utilizing linear regression (via scikit-learn) to predict 7-day price trajectories and identify historical lowest values.
+   - Implements automated Selenium scraping pipelines for Flipkart and Amazon, complete with local catalog bypass routines.
+
+---
+
+## Core Features
+
+- **Checked Price Analytics**: Paste any product URL from Amazon India, Flipkart, or Myntra to instantly view current cost details, store retailer badges, ratings, and active price statistics.
+- **Dynamic Need-Arc Gauge**: Visualizes price health scores dynamically on a conic-gradient needle gauge (Bad Time, Stable, Good Time) to recommend optimal buying times.
+- **Predictive Price Charts**: Simulates 30-day historical fluctuations and fits linear regression models to graph upcoming 7-day price trajectories on interactive canvas charts.
+- **Fast Meta-Image Showcase**: Instantly retrieves and renders actual high-resolution product photos scraped directly from target URL metadata tags, falling back to clean inline SVGs.
+- **Smart Promo Code Scanner**: Dynamically tests active discount coupons with live progress testing bars to calculate optimal checkout cart reductions.
+- **Integrated Workspace Dashboard**: Tracks verified cashbacks, manage active email notifications, simulate shipment timelines, and set automated custom price drop alerts.
+
+---
+
+## Folder Structure
+
+```
+pricevana/
+├── backend/
+│   ├── app.py                  # Pure JSON REST API with CORS support
+│   └── requirements.txt        # Backend dependencies (Flask, scikit-learn, etc.)
+└── frontend/
+    ├── index.html              # Portable HTML5 dashboard interface
+    └── static/
+        ├── style.css           # Vanilla CSS rules, theme variables, and keyframe animations
+        ├── script.js           # Client-side routing, API sync, chart binding, and UI logic
+        ├── logo.jpg            # Brand logo
+        └── images/
+            └── stores/         # Square store logos (Amazon, Flipkart, Dominos, PVR, etc.)
+```
 
 ---
 
@@ -44,43 +91,14 @@ This application is designed to be hosted separately: the frontend on Vercel and
 
 ### Frontend Deployment on Vercel
 
-Vercel hosts the static frontend files.
-
-1. Install the Vercel CLI globally or use the Vercel Dashboard.
-2. Log in to Vercel:
-   ```bash
-   vercel login
-   ```
-3. Initialize the deployment from the root directory by specifying the `frontend` folder as the root directory of your Vercel project, or by running:
-   ```bash
-   cd frontend
-   vercel
-   ```
-4. Follow the setup prompts:
-   - **Project Name**: `pricevana-frontend`
-   - **Framework Preset**: Other (None/Static HTML)
-   - **Directory**: `./` (inside the `frontend` folder)
-5. Set up production environmental variables or configure the `frontend/static/script.js` to point to the live Render backend URL if needed.
+Live : https://pricevana.vercel.app/
 
 ### Backend Deployment on Render
 
 Render hosts the Python Flask backend service.
 
-1. Sign in to your Render dashboard and click **New > Web Service**.
-2. Connect your Git repository.
-3. Configure the following project parameters:
-   - **Name**: `pricevana-backend`
-   - **Environment**: `Python`
-   - **Root Directory**: `backend`
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `gunicorn app:app`
-4. Select the Free tier and deploy.
-5. Copy the live backend URL provided by Render (e.g. `https://pricevana-backend.onrender.com`).
+Live : https://pricevana.onrender.com
 
 ---
 
-## Connecting Frontend to Backend
-
-The `frontend/static/script.js` detects the hosting environment:
-- If hosted locally or opened via `file://`, it maps request calls to `http://127.0.0.1:5000` (using regular HTTP without SSL).
-- In a production environment, if hosted on the same domain, it maps relatively. Alternatively, update the `API_BASE` variable in `frontend/static/script.js` to point to your live Render endpoint URL.
+Created with ❤️ for Pricevana by Deepanshu.
