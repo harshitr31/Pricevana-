@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Pricevana | Price History, Deals and Shopping Assistant</title>
+    <meta name="description" content="Track price fluctuations, predict deals, auto-apply coupons, and manage shopping emails and cashback rewards in one premium dashboard." />
+    <!-- CSS -->
+    <link rel="stylesheet" href="static/style.css?v=2.1" />
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Live Notification Toast -->
+    <div id="toastNotification" class="toast-notification" style="display: none;">
+        <div class="toast-header">
+            <i data-lucide="bell" class="toast-bell"></i>
+            <strong class="toast-title">Pricevana Alert</strong>
+            <span class="toast-time">just now</span>
+            <button onclick="closeToast()" class="toast-close-btn">&times;</button>
+        </div>
+        <div id="toastBody" class="toast-body">
+            Sony WH-1000XM4 dropped below your target price!
+        </div>
+    </div>
+
+    <!-- Coupon Auto-Apply Simulation Overlay -->
+    <div id="couponOverlay" class="coupon-overlay" style="display: none;">
+        <div class="coupon-modal glass-card">
+            <div class="coupon-modal-header">
+                <i data-lucide="zap" class="pulse-icon"></i>
+                <h3>Pricevana Coupon Finder</h3>
+            </div>
+            <div class="coupon-modal-body">
+                <div class="coupon-progress-container">
+                    <div id="couponProgressBar" class="coupon-progress-bar"></div>
+                </div>
+                <div id="couponStatusText" class="coupon-status-text">Scanning code: FKWELCOME10...</div>
+                <div id="couponStatusLog" class="coupon-status-log">
+                    <!-- Logs injected dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- UPI Cashback Withdrawal Modal -->
+    <div id="withdrawModal" class="coupon-overlay" style="display: none;">
+        <div class="withdraw-modal glass-card">
+            <div class="withdraw-header">
+                <h3><i data-lucide="wallet" style="vertical-align: middle; margin-right: 8px;"></i> Withdraw Cashback</h3>
+                <button onclick="closeWithdrawModal()" class="close-modal-btn">&times;</button>
+            </div>
+            <form id="withdrawForm" onsubmit="processWithdrawal(event)">
+                <div class="form-group">
+                    <label for="upiId">Enter UPI ID</label>
+                    <input id="upiId" type="text" placeholder="example@paytm" required />
+                </div>
+                <div class="form-group">
+                    <label for="withdrawAmount">Amount to Withdraw</label>
+                    <input id="withdrawAmount" type="number" step="0.01" min="1" placeholder="₹0.00" required />
+                    <p class="balance-help">Available: <span id="modalBalance">₹3,344.45</span></p>
+                </div>
+                <div class="withdraw-note" style="font-size:11px; color:var(--text-muted); margin-bottom:16px;">
+                    *Payout requests are transferred immediately to verified UPI addresses.
+                </div>
+                <button type="submit" class="btn primary" style="width: 100%;">
+                    Proceed to Payout <i data-lucide="arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- GIFT CARD PURCHASE MODAL -->
+    <div id="giftCardModal" class="coupon-overlay" style="display: none;">
+        <div class="withdraw-modal glass-card" style="width: 420px;">
+            <div class="withdraw-header">
+                <h3><i data-lucide="gift" style="vertical-align: middle; margin-right: 8px; color: #4f46e5;"></i> Buy Gift Card</h3>
+                <button onclick="closeGiftCardModal()" class="close-modal-btn">&times;</button>
+            </div>
+            <form id="giftCardForm" onsubmit="processGiftCardBuy(event)">
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px;">
+                    <div id="gcModalLogoWrap" class="gc-logo-wrap bg-indigo" style="width:40px; height:40px; font-size:18px; line-height:40px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:700; color:white;">
+                        D
+                    </div>
+                    <div>
+                        <h4 id="gcModalBrandName" style="font-size:15px; font-weight:700; margin:0; color:var(--text-main);">Dominos Pizza Card</h4>
+                        <span id="gcModalCashbackBadge" class="gc-badge" style="margin-top:2px;">FLAT 12.0% OFF</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="gcCardValue">Select/Enter Card Value (₹)</label>
+                    <input id="gcCardValue" type="number" min="100" max="10000" placeholder="Enter value (Min: ₹100)" oninput="calculateGiftCardCashback()" required />
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:20px; font-size:13px; display:flex; justify-content:space-between; color:var(--text-main);">
+                    <span style="color:var(--text-muted);">Estimated Cashback:</span>
+                    <strong id="gcModalRewardValue" style="color:var(--secondary);">₹0.00</strong>
+                </div>
+                <button type="submit" class="btn primary" style="width: 100%;">
+                    Buy Voucher & Claim Cashback <i data-lucide="zap"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="page">
+
+        <!-- HEADER -->
+        <header class="site-header">
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">P</div>
+                <div>
+                    <h1 class="site-title">Pricevana</h1>
+                    <p class="tagline">Price history and shopping assistant</p>
+                </div>
+            </div>
+            
+            <div class="theme-picker-container" style="display: flex; align-items: center; gap: 8px; margin-left: auto; margin-right: 16px;">
+                <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--text-muted);">Theme</span>
+                <div class="theme-picker-pill" style="display: flex; background: var(--panel-bg); padding: 4px; border-radius: 99px; border: 1px solid var(--border-color); gap: 6px;">
+                    <button class="theme-circle-btn active" data-theme="lavender" style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--primary); background: #5938de; cursor: pointer; padding: 0; outline: none; transition: var(--transition);" title="Lavender Dusk"></button>
+                    <button class="theme-circle-btn" data-theme="emerald" style="width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; background: #0f766e; cursor: pointer; padding: 0; outline: none; transition: var(--transition);" title="Emerald Sage"></button>
+                </div>
+            </div>
+
+            <nav class="site-nav">
+                <button id="tabBtnPredictor" class="tab-nav-btn active">
+                    <i data-lucide="trending-down"></i> Price Predictor
+                </button>
+                <button id="tabBtnDeals" class="tab-nav-btn">
+                    <i data-lucide="shopping-bag"></i> Deals & Gift Cards
+                </button>
+                <button id="tabBtnWorkspace" class="tab-nav-btn">
+                    <i data-lucide="mail"></i> My Smart Space
+                    <span class="unread-dot" id="inboxUnreadDot">1</span>
+                </button>
+                <button class="nav-install" onclick="toggleExtSidebar()">
+                    <i data-lucide="chrome"></i> Install Extension
+                </button>
+            </nav>
+        </header>
+
+        <!-- TAB 1: PRICE PREDICTOR & SCRAPER -->
+        <div id="tabContentPredictor" class="tab-pane active">
+            <section class="tracker-hero">
+                <span class="hero-kicker"><i data-lucide="sparkles"></i> PRICE HISTORY & TRACKER</span>
+                <h2 class="hero-title">Find real deals.<br><span>Skip the fake ones.</span></h2>
+                <p class="hero-copy">Track genuine price drops, compare stores, find coupons and set smart alerts before you buy.</p>
+                <div class="tracker-panel">
+                    <p class="tracker-tip">Paste a product link from Amazon, Flipkart or Myntra</p>
+                    <div class="tracker-search">
+                        <i data-lucide="link-2" class="tracker-link-icon"></i>
+                        <input id="productUrl" type="url" placeholder="Paste a product link or search for a product..." />
+                        <button id="predictBtn" class="btn primary">
+                            <i data-lucide="search"></i>
+                            Check Price
+                        </button>
+                    </div>
+                    <div class="tracker-meta">
+                        <button id="exampleBtn" class="try-link">
+                            <i data-lucide="wand-2"></i> Try an example product
+                        </button>
+                        <div class="supported">
+                            <span>Works with</span>
+                            <span class="chip">Amazon</span>
+                            <span class="chip">Flipkart</span>
+                            <span class="chip">Myntra</span>
+                        </div>
+                    </div>
+
+                        <!-- Prediction Result Area -->
+                        <div id="result" class="result-container">
+                            <!-- Content will be injected by JS -->
+                        </div>
+
+                        <!-- Coupon Magic Widget (BuyHatke-style) -->
+                        <div id="couponWidget" class="interactive-widget-section" style="display: none; margin-top: 32px;">
+                            <hr class="section-divider">
+                            <h3 class="widget-title">
+                                <i data-lucide="tag"></i> Smart Coupons & Deals
+                            </h3>
+                            <p class="widget-desc">Available active promotional vouchers detected for this retailer.</p>
+                            <div id="couponList" class="coupon-list-grid">
+                                <!-- Coupons will be injected dynamically -->
+                            </div>
+                            <button id="applyCouponsBtn" class="btn primary-outline" style="width: 100%; margin-top: 16px;">
+                                <i data-lucide="zap"></i> Auto-Apply Coupons (Simulated)
+                            </button>
+                        </div>
+
+                        <!-- Price Alert Setup Form (BuyHatke-style) -->
+                        <div id="priceAlertWidget" class="interactive-widget-section" style="display: none; margin-top: 32px;">
+                            <hr class="section-divider">
+                            <h3 class="widget-title">
+                                <i data-lucide="bell"></i> Set Price Alert
+                            </h3>
+                            <p class="widget-desc">Get notified instantly when the price drops below your target.</p>
+                            <form id="priceAlertForm" onsubmit="createPriceAlert(event)" style="margin-top: 12px;">
+                                <div class="alert-form-grid">
+                                    <input id="alertEmail" type="email" placeholder="name@example.com" required class="alert-input" />
+                                    <input id="alertTargetPrice" type="number" placeholder="Target Price" required class="alert-input" />
+                                    <button type="submit" class="btn primary alert-submit-btn">Set Alert</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Comparison Section -->
+                        <div id="comparisonSection" class="comparison-container" style="display:none; margin-top: 32px;">
+                            <hr class="section-divider">
+                            <h3 style="font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="arrow-left-right"></i>
+                                Market Comparison
+                            </h3>
+                            <div id="comparisonList" class="comparison-grid">
+                                <!-- Comparison cards will be injected here -->
+                            </div>
+                        </div>
+
+                        <!-- AI Advice Area -->
+                        <div id="aiSection" style="display:none;">
+                            <div class="ai-header">
+                                <i data-lucide="sparkles"></i>
+                                <span>AI Buying Strategy</span>
+                            </div>
+                            <div id="aiResult" class="ai-content">
+                                <!-- AI Advice will be injected here -->
+                            </div>
+                            <button id="aiBtn" class="btn primary" style="width: 100%; margin-top: 15px;">
+                                Refresh AI Strategy
+                            </button>
+                        </div>
+
+                        <!-- Similar Products Widget -->
+                        <div id="similarProductsSection" style="display:none; margin-top: 32px;">
+                            <hr class="section-divider">
+                            <h3 style="font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="sparkles" style="color: var(--secondary);"></i>
+                                Similar Products & Alternatives
+                            </h3>
+                            <div id="similarProductsGrid" class="deals-grid">
+                                <!-- Alternative deal cards injected dynamically -->
+                            </div>
+                        </div>
+                </div>
+                <img class="hero-art" src="static/images/hero-price-tracker.webp" alt="Price tracking dashboard with shopping products and price drop alerts" />
+
+                <div class="trust-stats" aria-label="Pricevana highlights">
+                    <div><strong>10M+</strong><span>Smart shoppers</span></div>
+                    <div><strong>&#8377;20Cr+</strong><span>Savings spotted</span></div>
+                    <div><strong>100+</strong><span>Stores tracked</span></div>
+                    <div><strong>4.7</strong><span>User rating</span></div>
+                </div>
+
+                <div class="carry-panel">
+                    <div>
+                        <span class="section-kicker">SHOP WHILE YOU BROWSE</span>
+                        <h3>Carry the deal checker wherever you go</h3>
+                        <p>Watch prices and uncover coupons on product pages while you shop online.</p>
+                    </div>
+                    <img class="carry-image" src="static/images/browser-assistant.webp" alt="Browser shopping assistant showing price history and coupon savings" />
+                    <div class="carry-actions">
+                        <button class="download-card" onclick="toggleExtSidebar()">
+                            <i data-lucide="chrome"></i>
+                            <span><small>Browser Assistant</small>Install, it is free</span>
+                        </button>
+                        <div class="download-card app-card">
+                            <i data-lucide="smartphone"></i>
+                            <span><small>Mobile App</small>Get Pricevana</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="livePriceTicker" class="ticker-wrap ticker-home">
+                    <div class="ticker-header">
+                        <i data-lucide="activity" class="pulse-icon"></i>
+                        <span>Live price drops discovered today</span>
+                    </div>
+                    <div class="ticker-container">
+                        <div class="ticker-track" id="liveTickerTrack">
+                            <!-- Rotating items loaded in JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- TAB 2: DEALS & GIFT CARDS HUB (BUYHATKE-STYLE) -->
+        <div id="tabContentDeals" class="tab-pane">
+            <!-- DEALS HERO BANNER -->
+            <div class="deals-hero-banner glass-card">
+                <div style="position: relative; z-index: 2;">
+                    <h2>Find Real Deals, Skip the Fake Ones</h2>
+                    <p>Track genuine price drops, compare across stores, and earn flat cashbacks on every deal.</p>
+                    
+                    <!-- Keyword Search Bar -->
+                    <form id="dealSearchForm" onsubmit="executeKeywordSearch(event)">
+                        <i data-lucide="search" class="search-icon-inside"></i>
+                        <input id="dealSearchInput" type="text" placeholder="Search smartphones, loungewear, sneakers, or brands..." />
+                        <button type="submit" class="btn primary search-submit-btn">
+                            Search
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- SEARCH RESULTS SECTION -->
+            <section id="searchResultsSection" style="display:none; margin-bottom: 40px;">
+                <div class="section-title-bar">
+                    <div>
+                        <h2 style="font-size:22px; font-weight:700;"><i data-lucide="search" style="vertical-align:middle; margin-right:8px; color: var(--primary);"></i> Search Results</h2>
+                        <p id="searchResultCount" style="font-size:13px; color:var(--text-muted); margin-top: 2px;">Matches found</p>
+                    </div>
+                    <button class="btn ghost btn-sm" onclick="clearSearchResults()">Clear Search</button>
+                </div>
+                <div id="searchResultsGrid" class="deals-grid">
+                    <!-- Injected dynamically -->
+                </div>
+            </section>
+
+            <!-- SMART GROCERY BASKET MULTI-COMPARISON (NEW FEATURE) -->
+            <section class="grocery-basket-section glass-card" style="margin-bottom: 40px; padding: 24px;">
+                <div class="section-title-bar" style="margin-bottom:20px; flex-direction:column; align-items:start; gap:4px;">
+                    <h2 style="font-size:20px; font-weight:700; margin:0;"><i data-lucide="shopping-cart" style="vertical-align:middle; margin-right:8px; color:#6366f1;"></i> Smart Grocery Basket Comparison</h2>
+                    <p style="font-size:13px; color:var(--text-muted); margin:0;">Compare shopping checkout lists dynamically across <strong>Blinkit, BigBasket, and Zepto</strong>.</p>
+                </div>
+                
+                <div class="grocery-layout" style="display:grid; grid-template-columns:1.2fr 1fr; gap:20px;">
+                    <!-- Items selection checklist -->
+                    <div class="grocery-checklist-pane" style="background:white; border:1px solid #e2e8f0; border-radius:var(--radius-md); padding:16px;">
+                        <h4 style="font-size:14px; font-weight:600; margin-bottom:12px; color:var(--text-main);">Add Items to Basket:</h4>
+                        <div class="grocery-items-check-grid" style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="grocery-check-label" style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                                <input type="checkbox" value="milk" checked onchange="updateBasketComparison()" style="accent-color:var(--primary);" /> Organic Whole Milk (1L) - ₹70 average
+                            </label>
+                            <label class="grocery-check-label" style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                                <input type="checkbox" value="coffee" checked onchange="updateBasketComparison()" style="accent-color:var(--primary);" /> Premium Roast Coffee (200g) - ₹350 average
+                            </label>
+                            <label class="grocery-check-label" style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                                <input type="checkbox" value="almonds" onchange="updateBasketComparison()" style="accent-color:var(--primary);" /> California Almonds (500g) - ₹440 average
+                            </label>
+                            <label class="grocery-check-label" style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                                <input type="checkbox" value="bread" checked onchange="updateBasketComparison()" style="accent-color:var(--primary);" /> Whole Wheat Bread (400g) - ₹46 average
+                            </label>
+                            <label class="grocery-check-label" style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                                <input type="checkbox" value="eggs" onchange="updateBasketComparison()" style="accent-color:var(--primary);" /> Farm Fresh Eggs (12 Pack) - ₹92 average
+                            </label>
+                            <label class="grocery-check-label" style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:13px; color:var(--text-main);">
+                                <input type="checkbox" value="butter" checked onchange="updateBasketComparison()" style="accent-color:var(--primary);" /> Premium Salted Butter (500g) - ₹270 average
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Result Matrix -->
+                    <div class="grocery-totals-pane" style="display:flex; flex-direction:column; gap:12px;">
+                        <div class="store-total-card glass-card" id="bbTotalCard" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border:1px solid var(--border-color);">
+                            <div>
+                                <h5 style="font-size:12px; color:var(--text-muted); margin:0;">BIGBASKET</h5>
+                                <span id="bigbasketTotal" style="font-size:20px; font-weight:700; color:var(--text-main);">₹0.00</span>
+                            </div>
+                            <span class="store-badge" id="bbCheapestBadge" style="display:none; font-size:10px; font-weight:700; background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px;">CHEAPEST</span>
+                        </div>
+                        <div class="store-total-card glass-card" id="blTotalCard" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border:1px solid var(--border-color);">
+                            <div>
+                                <h5 style="font-size:12px; color:var(--text-muted); margin:0;">BLINKIT</h5>
+                                <span id="blinkitTotal" style="font-size:20px; font-weight:700; color:var(--text-main);">₹0.00</span>
+                            </div>
+                            <span class="store-badge" id="blCheapestBadge" style="display:none; font-size:10px; font-weight:700; background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px;">CHEAPEST</span>
+                        </div>
+                        <div class="store-total-card glass-card" id="zpTotalCard" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border:1px solid var(--border-color);">
+                            <div>
+                                <h5 style="font-size:12px; color:var(--text-muted); margin:0;">ZEPTO</h5>
+                                <span id="zeptoTotal" style="font-size:20px; font-weight:700; color:var(--text-main);">₹0.00</span>
+                            </div>
+                            <span class="store-badge" id="zpCheapestBadge" style="display:none; font-size:10px; font-weight:700; background:#d1fae5; color:#065f46; padding:4px 8px; border-radius:4px;">CHEAPEST</span>
+                        </div>
+                        
+                        <button class="btn primary" id="basketCheckoutBtn" onclick="checkoutCheapestBasket()" style="margin-top:auto; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+                            Checkout Cheapest Basket & Earn PCO <i data-lucide="zap"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- BRAND GIFT CARDS HUB -->
+            <section class="gift-cards-section" style="margin-bottom: 40px;">
+                <div class="section-title-bar">
+                    <div>
+                        <h2 style="font-size:22px; font-weight:700;"><i data-lucide="gift" style="vertical-align:middle; margin-right:8px; color:#4f46e5;"></i> Brand Gift Cards</h2>
+                        <p style="font-size:13px; color:var(--text-muted); margin-top: 2px;">Purchase brand gift vouchers to earn flat cashback credited instantly to your wallet.</p>
+                    </div>
+                </div>
+                <div class="gift-cards-grid">
+                    <!-- Amazon -->
+                    <div class="gift-card-item glass-card">
+                        <div class="gc-logo-wrap" style="background: white; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: var(--radius-md);">
+                            <img src="static/images/stores/amazon.png" alt="Amazon" style="max-width: 80%; max-height: 80%; object-fit: contain;" />
+                        </div>
+                        <div class="gc-details">
+                            <span class="gc-badge bg-orange-light">FLAT 0.5% CASHBACK</span>
+                            <h4>Amazon Pay Card</h4>
+                            <button class="btn primary-outline btn-sm" onclick="openGiftCardBuy('amazon')">Buy Voucher</button>
+                        </div>
+                    </div>
+                    <!-- Flipkart -->
+                    <div class="gift-card-item glass-card">
+                        <div class="gc-logo-wrap" style="background: white; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: var(--radius-md);">
+                            <img src="static/images/stores/flipkart.png" alt="Flipkart" style="max-width: 85%; max-height: 85%; object-fit: contain;" />
+                        </div>
+                        <div class="gc-details">
+                            <span class="gc-badge bg-blue-light">FLAT 1.0% CASHBACK</span>
+                            <h4>Flipkart Gift Card</h4>
+                            <button class="btn primary-outline btn-sm" onclick="openGiftCardBuy('flipkart')">Buy Voucher</button>
+                        </div>
+                    </div>
+                    <!-- Myntra -->
+                    <div class="gift-card-item glass-card">
+                        <div class="gc-logo-wrap" style="background: white; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: var(--radius-md);">
+                            <img src="static/images/stores/myntra.png" alt="Myntra" style="max-width: 75%; max-height: 75%; object-fit: contain;" />
+                        </div>
+                        <div class="gc-details">
+                            <span class="gc-badge bg-pink-light">FLAT 4.5% CASHBACK</span>
+                            <h4>Myntra Gift Card</h4>
+                            <button class="btn primary-outline btn-sm" onclick="openGiftCardBuy('myntra')">Buy Voucher</button>
+                        </div>
+                    </div>
+                    <!-- Dominos -->
+                    <div class="gift-card-item glass-card">
+                        <div class="gc-logo-wrap" style="background: white; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: var(--radius-md);">
+                            <img src="static/images/stores/dominos.png" alt="Dominos" style="max-width: 80%; max-height: 80%; object-fit: contain;" />
+                        </div>
+                        <div class="gc-details">
+                            <span class="gc-badge bg-red-light">FLAT 12.0% CASHBACK</span>
+                            <h4>Dominos Pizza Card</h4>
+                            <button class="btn primary-outline btn-sm" onclick="openGiftCardBuy('dominos')">Buy Voucher</button>
+                        </div>
+                    </div>
+                    <!-- Blinkit -->
+                    <div class="gift-card-item glass-card">
+                        <div class="gc-logo-wrap" style="background: white; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: var(--radius-md);">
+                            <img src="static/images/stores/blinkit.png" alt="Blinkit" style="max-width: 80%; max-height: 80%; object-fit: contain;" />
+                        </div>
+                        <div class="gc-details">
+                            <span class="gc-badge bg-yellow-light">FLAT 3.0% CASHBACK</span>
+                            <h4>Blinkit Gift Card</h4>
+                            <button class="btn primary-outline btn-sm" onclick="openGiftCardBuy('blinkit')">Buy Voucher</button>
+                        </div>
+                    </div>
+                    <!-- PVR -->
+                    <div class="gift-card-item glass-card">
+                        <div class="gc-logo-wrap" style="background: white; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; width: 50px; height: 50px; border-radius: var(--radius-md);">
+                            <img src="static/images/stores/pvr.png" alt="PVR" style="max-width: 80%; max-height: 80%; object-fit: contain;" />
+                        </div>
+                        <div class="gc-details">
+                            <span class="gc-badge bg-purple-light">FLAT 18.0% CASHBACK</span>
+                            <h4>PVR Cinema Card</h4>
+                            <button class="btn primary-outline btn-sm" onclick="openGiftCardBuy('pvr')">Buy Voucher</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HOT BUDGET DEALS -->
+            <section class="budget-deals-section" style="margin-bottom: 40px;">
+                <div class="section-title-bar" style="flex-direction: column; align-items: center; text-align: center; gap: 8px;">
+                    <h2 style="font-size:22px; font-weight:700;"><i data-lucide="zap" style="vertical-align:middle; margin-right:8px; color:#d97706;"></i> Hot Deals</h2>
+                    <p style="font-size:13px; color:var(--text-muted); margin-top: 2px;">Budget-friendly recommendations loaded dynamically by deal scanners</p>
+                    
+                    <div class="budget-tiers-nav">
+                        <button id="tierBtn99" class="budget-tier-btn active" onclick="loadBudgetDeals('99', this)">UNDER ₹99</button>
+                        <button id="tierBtn199" class="budget-tier-btn" onclick="loadBudgetDeals('199', this)">UNDER ₹199</button>
+                        <button id="tierBtn299" class="budget-tier-btn" onclick="loadBudgetDeals('299', this)">UNDER ₹299</button>
+                        <button id="tierBtn399" class="budget-tier-btn" onclick="loadBudgetDeals('399', this)">UNDER ₹399</button>
+                    </div>
+                </div>
+
+                <div id="budgetDealsGrid" class="deals-grid">
+                    <!-- Injected dynamically -->
+                </div>
+            </section>
+
+            <!-- SHOP BY CATEGORIES -->
+            <section class="categories-section" style="margin-bottom: 40px;">
+                <div class="section-title-bar">
+                    <div>
+                        <h2 style="font-size:22px; font-weight:700;"><i data-lucide="grid" style="vertical-align:middle; margin-right:8px; color:#10b981;"></i> Shop by Categories</h2>
+                        <p style="font-size:13px; color:var(--text-muted); margin-top: 2px;">Filter top discounts and price fluctuations by department.</p>
+                    </div>
+                </div>
+                
+                <div class="categories-grid">
+                    <!-- Phones -->
+                    <div class="category-tile glass-card" onclick="loadCategoryDeals('smartphones', this)">
+                        <div class="cat-icon-wrap bg-blue-light text-blue"><i data-lucide="smartphone"></i></div>
+                        <h4>Smartphones</h4>
+                        <span class="cat-deal-lbl">Starting from ₹34,999</span>
+                    </div>
+                    <!-- Laptops -->
+                    <div class="category-tile glass-card" onclick="loadCategoryDeals('laptops', this)">
+                        <div class="cat-icon-wrap bg-purple-light text-purple"><i data-lucide="laptop"></i></div>
+                        <h4>Laptops</h4>
+                        <span class="cat-deal-lbl">Under ₹34,999</span>
+                    </div>
+                    <!-- TVs -->
+                    <div class="category-tile glass-card" onclick="loadCategoryDeals('televisions', this)">
+                        <div class="cat-icon-wrap bg-red-light text-red"><i data-lucide="tv"></i></div>
+                        <h4>Televisions</h4>
+                        <span class="cat-deal-lbl">Under ₹6,999</span>
+                    </div>
+                    <!-- Fridge -->
+                    <div class="category-tile glass-card" onclick="loadCategoryDeals('appliances', this)">
+                        <div class="cat-icon-wrap bg-orange-light text-orange"><i data-lucide="refrigerator"></i></div>
+                        <h4>Home Appliances</h4>
+                        <span class="cat-deal-lbl">Under ₹14,999</span>
+                    </div>
+                </div>
+
+                <!-- Category Deals Area -->
+                <div id="categoryDealsSection" style="display:none; margin-top:30px;">
+                    <h3 id="categoryDealsTitle" style="font-size:16px; margin-bottom:16px; font-weight:600; color:var(--text-main);">Smartphones Deals</h3>
+                    <div id="categoryDealsGrid" class="deals-grid">
+                        <!-- Injected dynamically -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- TAB 3: SMART WORKSPACE (FLASH.CO-STYLE) -->
+        <div id="tabContentWorkspace" class="tab-pane">
+            <section class="workspace-layout">
+                <!-- WALLET STATS BAR -->
+                <div class="wallet-compact-bar glass-card">
+                    <div class="wallet-stat">
+                        <span class="stat-lbl">Pricevana Smart Inbox</span>
+                        <span class="stat-val inbox-email-text">user@pricevana.co</span>
+                    </div>
+                    <div class="wallet-stat">
+                        <span class="stat-lbl">Cashback Balance</span>
+                        <span class="stat-val text-green" id="walletBalanceTop">₹3,344.45</span>
+                    </div>
+                    <div class="wallet-stat">
+                        <span class="stat-lbl">Pricevana Coins</span>
+                        <span class="stat-val text-amber" id="walletCoinsTop">1,520 PCO</span>
+                    </div>
+                    <button class="btn primary withdraw-btn" onclick="openWithdrawModal()">
+                        <i data-lucide="arrow-up-right"></i> Withdraw Payout
+                    </button>
+                </div>
+
+                <!-- WORKSPACE SUB-NAVIGATION -->
+                <div class="workspace-tabs-nav">
+                    <button id="workSubTabInbox" class="sub-tab-btn active">
+                        <i data-lucide="mail"></i> Orders Inbox & Tracker
+                    </button>
+                    <button id="workSubTabWallet" class="sub-tab-btn">
+                        <i data-lucide="wallet"></i> Wallet & Spend Lens
+                    </button>
+                    <button id="workSubTabAlerts" class="sub-tab-btn">
+                        <i data-lucide="bell"></i> Managed Price Alerts
+                    </button>
+                </div>
+
+                <!-- SUB-PANE 1: ORDERS INBOX & TRACKER -->
+                <div id="workPaneInbox" class="sub-pane active">
+                    <div class="inbox-layout">
+                        <!-- Email List Sidebar -->
+                        <div class="inbox-sidebar">
+                            <div class="inbox-sidebar-header">
+                                <h4>All Orders Received</h4>
+                            </div>
+                            <div id="inboxList" class="inbox-email-list">
+                                <!-- Email entries injected dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Email Viewer & Tracker Detail -->
+                        <div class="inbox-viewer glass-card">
+                            <div id="emailViewerPlaceholder" class="viewer-placeholder">
+                                <i data-lucide="mail-open"></i>
+                                <p>Select an email to view purchase details and live shipping status</p>
+                            </div>
+                            <div id="emailViewerContent" style="display: none;">
+                                <!-- Live Tracker Timeline -->
+                                <div class="tracker-timeline-section">
+                                    <div class="timeline-header">
+                                        <h4>Live Delivery Tracker</h4>
+                                        <button id="advanceStatusBtn" class="btn ghost btn-sm">
+                                            <i data-lucide="truck"></i> Simulate Status Advance
+                                        </button>
+                                    </div>
+                                    <div class="stepper-wrapper">
+                                        <div class="stepper-step" id="step1">
+                                            <div class="stepper-circle"><i data-lucide="shopping-bag"></i></div>
+                                            <span class="stepper-label">Ordered</span>
+                                        </div>
+                                        <div class="stepper-line" id="line1"></div>
+                                        <div class="stepper-step" id="step2">
+                                            <div class="stepper-circle"><i data-lucide="package"></i></div>
+                                            <span class="stepper-label">Shipped</span>
+                                        </div>
+                                        <div class="stepper-line" id="line2"></div>
+                                        <div class="stepper-step" id="step3">
+                                            <div class="stepper-circle"><i data-lucide="truck"></i></div>
+                                            <span class="stepper-label">Out for Delivery</span>
+                                        </div>
+                                        <div class="stepper-line" id="line3"></div>
+                                        <div class="stepper-step" id="step4">
+                                            <div class="stepper-circle"><i data-lucide="check-circle-2"></i></div>
+                                            <span class="stepper-label">Delivered</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr class="section-divider" style="margin: 20px 0;">
+                                <!-- Email Message Body -->
+                                <div id="emailMessageBody" class="email-message-body">
+                                    <!-- Injected dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-PANE 2: WALLET & SPEND LENS (NEW) -->
+                <div id="workPaneWallet" class="sub-pane">
+                    <!-- Spend Lens Dashboard Panel -->
+                    <div id="spendLensPanel" class="spend-lens-container glass-card" style="margin-bottom: 24px; padding: 24px;">
+                        <h3 style="font-size:16px; margin-bottom:16px; font-weight:600; display:flex; align-items:center; gap:8px;"><i data-lucide="line-chart" style="color:var(--primary);"></i> Pricevana Spend Lens Analytics</h3>
+                        <div class="spend-lens-grid" style="display:grid; grid-template-columns: 1.2fr 1fr 1fr; gap:20px;">
+                            <!-- Store breakdown percentages list -->
+                            <div class="spend-lens-card" style="background:rgba(255,255,255,0.4); border-radius:12px; padding:16px; border:1px solid rgba(0,0,0,0.03); display:flex; flex-direction:column; justify-content:center;">
+                                <h4 style="font-size:11px; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px; font-weight:700; letter-spacing:0.5px;">Spend Share by Retailer</h4>
+                                <div id="spendLensRetailerBreakdown" class="spend-share-list" style="display:flex; flex-direction:column; gap:10px;">
+                                    <!-- Loaded dynamically -->
+                                </div>
+                            </div>
+                            <!-- Cashback efficiency stat -->
+                            <div class="spend-lens-card" style="background:rgba(255,255,255,0.4); border-radius:12px; padding:16px; border:1px solid rgba(0,0,0,0.03); text-align:center; display:flex; flex-direction:column; justify-content:center;">
+                                <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:600; letter-spacing:0.5px;">Cashback Efficiency</span>
+                                <strong id="spendLensEfficiency" style="font-size:28px; color:var(--secondary); font-weight:700; margin:6px 0;">5.0%</strong>
+                                <span style="font-size:11px; color:var(--text-muted);">Flat average reward yield</span>
+                            </div>
+                            <!-- missed savings stats -->
+                            <div class="spend-lens-card" style="background:rgba(255,255,255,0.4); border-radius:12px; padding:16px; border:1px solid rgba(0,0,0,0.03); text-align:center; display:flex; flex-direction:column; justify-content:center;">
+                                <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:600; letter-spacing:0.5px;">Pricevana Savings Shield</span>
+                                <strong id="spendLensMissed" style="font-size:28px; color:#4f46e5; font-weight:700; margin:6px 0;">₹4,820</strong>
+                                <span style="font-size:11px; color:var(--text-muted);">Saved by tracking price drops</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="wallet-layout">
+                        <!-- Balance Card -->
+                        <div class="wallet-balance-card glass-card">
+                            <h3>My Cashback Wallet</h3>
+                            <div class="balance-mega" id="walletBalanceMega">₹3,344.45</div>
+                            <div class="coins-mega" id="walletCoinsMega"><i data-lucide="star"></i> 1,520 Pricevana Coins</div>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-top: 12px;">Accumulated from verified purchases tracking through your pricevana.co mailbox.</p>
+                            <button class="btn primary" style="margin-top: 20px; width: 100%;" onclick="openWithdrawModal()">
+                                Withdraw to Bank / UPI <i data-lucide="arrow-right"></i>
+                            </button>
+                        </div>
+
+                        <!-- Payout / Transaction logs -->
+                        <div class="wallet-transactions-card glass-card">
+                            <h3>Transaction History</h3>
+                            <div class="table-container">
+                                <table class="tx-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>Description</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="walletTxList">
+                                        <!-- Transactions injected dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUB-PANE 3: ACTIVE PRICE ALERTS -->
+                <div id="workPaneAlerts" class="sub-pane">
+                    <div class="alerts-tab-layout glass-card">
+                        <div class="alerts-header">
+                            <div>
+                                <h3>Managed Price Alerts</h3>
+                                <p style="font-size:13px; color:var(--text-muted);">Tracked products configured for instant drop alerting.</p>
+                            </div>
+                            <!-- Simulation Action Button -->
+                            <button id="simulateAlertBtn" class="btn ghost">
+                                <i data-lucide="sparkles"></i> Simulate Immediate Price Drop
+                            </button>
+                        </div>
+                        <div class="alerts-table-container">
+                            <table class="tx-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Product Name</th>
+                                        <th>Registered Email</th>
+                                        <th>Target Price</th>
+                                        <th>Current Price</th>
+                                        <th>Alert Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activeAlertsList">
+                                    <!-- Alerts injected dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- FEATURES SECTION -->
+        <main class="features" id="marketingFeaturesSection">
+            <div class="section-heading">
+                <span class="section-kicker">WHY PRICEVANA?</span>
+                <h2>Tools designed to help you shop smarter</h2>
+                <p>Everything you need to verify a sale, find better prices and save at checkout.</p>
+            </div>
+            <img class="tools-image" src="static/images/smart-savings.webp" alt="Shopping basket, cashback wallet, gift card and price alert tools" />
+            <div class="feature-cards">
+                <article class="feature">
+                    <div class="feature-icon"><i data-lucide="line-chart"></i></div>
+                    <h3>Price History</h3>
+                    <p>See past pricing and a projected low before trusting a sale badge.</p>
+                </article>
+                <article class="feature">
+                    <div class="feature-icon"><i data-lucide="bell-ring"></i></div>
+                    <h3>Smart Alerts</h3>
+                    <p>Set a target price and track when a product reaches your budget.</p>
+                </article>
+                <article class="feature">
+                    <div class="feature-icon"><i data-lucide="ticket-percent"></i></div>
+                    <h3>Auto Coupons</h3>
+                    <p>Find promotional vouchers and simulate the best checkout saving.</p>
+                </article>
+                <article class="feature">
+                    <div class="feature-icon"><i data-lucide="shopping-basket"></i></div>
+                    <h3>Grocery Compare</h3>
+                    <p>Compare a complete basket across stores instead of one item at a time.</p>
+                </article>
+                <article class="feature">
+                    <div class="feature-icon"><i data-lucide="wallet-cards"></i></div>
+                    <h3>Spend Lens</h3>
+                    <p>View cashback, tracked orders and your retailer spending breakdown.</p>
+                </article>
+                <article class="feature">
+                    <div class="feature-icon"><i data-lucide="gift"></i></div>
+                    <h3>Gift Cards</h3>
+                    <p>Explore discounted vouchers and instantly estimate cashback rewards.</p>
+                </article>
+            </div>
+
+            <section class="stores-section">
+                <div class="section-heading compact">
+                    <h2>Stores supported</h2>
+                </div>
+                <div class="store-pills">
+                    <div class="store-card"><img src="static/images/stores/amazon.png" alt="" loading="lazy"><span>Amazon</span></div>
+                    <div class="store-card"><img src="static/images/stores/flipkart.png" alt="" loading="lazy"><span>Flipkart</span></div>
+                    <div class="store-card"><img src="static/images/stores/myntra.png" alt="" loading="lazy"><span>Myntra</span></div>
+                    <div class="store-card"><img src="static/images/stores/ajio.jpg" alt="" loading="lazy"><span>AJIO</span></div>
+                    <div class="store-card"><img src="static/images/stores/nykaa.png" alt="" loading="lazy"><span>Nykaa</span></div>
+                    <div class="store-card bigbasket-card">
+                        <svg class="bigbasket-logo" aria-hidden="true"><use href="static/images/stores/bigbasket.svg#bb-logo"></use></svg>
+                        <span class="sr-only">BigBasket</span>
+                    </div>
+                    <div class="store-card"><img src="static/images/stores/blinkit.png" alt="" loading="lazy"><span>Blinkit</span></div>
+                    <div class="store-card"><img src="static/images/stores/zepto.png" alt="" loading="lazy"><span>Zepto</span></div>
+                </div>
+            </section>
+
+            <section class="faq-section">
+                <div class="section-heading compact">
+                    <span class="section-kicker">HELP CENTRE</span>
+                    <h2>Frequently asked questions</h2>
+                </div>
+                <div class="faq-grid">
+                    <details open>
+                        <summary>How does the price history linear model work?</summary>
+                        <p>Our machine learning prediction engine aggregates recent pricing variations from scanned product pages and simulates short-term price fluctuations using linear regression algorithms to predict price drops over the coming week.</p>
+                    </details>
+                    <details>
+                        <summary>Is the Smart Inbox compatible with my email client?</summary>
+                        <p>Yes, your simulated user@pricevana.co inbox operates automatically via smart email tracking triggers that capture receipts securely from Amazon, Flipkart, Myntra and grocery checkout actions.</p>
+                    </details>
+                    <details>
+                        <summary>How fast can I withdraw my cashback payout?</summary>
+                        <p>Once you submit a withdrawal request with a verified UPI handle, mock bank payouts are simulated and completed immediately, with debit logs reflected in your transactional registry.</p>
+                    </details>
+                </div>
+            </section>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="site-footer">
+            <div class="footer-brand">
+                <strong>Pricevana</strong>
+                <p>Price history, comparisons, alerts and rewards for smarter shopping.</p>
+            </div>
+            <div class="footer-links">
+                <span>Hot Deals</span><span>Price Alerts</span><span>Gift Cards</span><span>Supported Stores</span>
+            </div>
+            <p class="copyright">&copy; <span id="year"></span> Pricevana. Smart price predictions.</p>
+        </footer>
+
+    </div>
+
+    <!-- BUYHATKE-STYLE FLOATING BROWSER EXTENSION SIMULATOR -->
+    <!-- Floating Extension Launcher Icon -->
+    <div id="extLauncher" class="ext-launcher-btn" onclick="toggleExtSidebar()" title="Open Pricevana Browser Assistant">
+        <i data-lucide="globe" class="ext-icon-glowing"></i>
+        <span class="ext-launcher-badge">Active</span>
+    </div>
+
+    <!-- Slide-out Sidebar Panel -->
+    <div id="extSidebar" class="ext-sidebar glass-card" style="display: none;">
+        <div class="ext-sidebar-header">
+            <div class="ext-header-brand">
+                <i data-lucide="globe" style="color: var(--primary); width: 18px; height: 18px;"></i>
+                <strong>Pricevana Assistant</strong>
+            </div>
+            <button onclick="toggleExtSidebar()" class="ext-close-btn">&times;</button>
+        </div>
+        
+        <div class="ext-sidebar-body">
+            <!-- Store context info -->
+            <div class="ext-store-indicator">
+                <div class="ext-dot-pulse"></div>
+                <span>Detected on: <strong id="extStoreName">Amazon.in</strong></span>
+            </div>
+            
+            <h4 id="extProductTitle" class="ext-product-title">Sony WH-1000XM4 Noise Cancelling Headphones</h4>
+            
+            <div class="ext-metrics-grid">
+                <div class="ext-metric-card">
+                    <span class="ext-m-label">Current Rate</span>
+                    <strong id="extCurrentPrice" class="ext-m-value">₹19,999</strong>
+                </div>
+                <div class="ext-metric-card">
+                    <span class="ext-m-label">Buy Score</span>
+                    <strong id="extBuyScore" class="ext-m-value text-green">85</strong>
+                </div>
+            </div>
+
+            <!-- Trend alert -->
+            <div class="ext-trend-card">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="trending-down" style="color: var(--primary); width: 16px; height: 16px;"></i>
+                    <strong style="font-size: 12px; color: var(--text-main);">Price Drop Warning</strong>
+                </div>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+                    This product price is predicted to drop below target within 4 days! We recommend setting an alert.
+                </p>
+            </div>
+
+            <!-- Coupons helper -->
+            <div class="ext-coupons-box">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-size: 12px; font-weight:600;"><i data-lucide="tag" style="width:13px; height:13px; vertical-align:middle; margin-right:4px;"></i> Coupons Detected</span>
+                    <span class="gc-badge bg-blue-light" style="font-size:9px;">4 Active</span>
+                </div>
+                <button class="btn primary" style="width:100%; font-size:12px; padding:10px;" onclick="triggerExtCoupons()">
+                    Auto-Apply & Save <i data-lucide="zap" style="width:12px; height:12px;"></i>
+                </button>
+            </div>
+
+            <!-- Similar recommendations sparkline -->
+            <div class="ext-recommendations">
+                <span style="font-size: 12px; font-weight:600; display:block; margin-bottom:10px;">
+                    <i data-lucide="sparkles" style="width:13px; height:13px; vertical-align:middle; margin-right:4px; color: var(--secondary);"></i> 
+                    Cheaper Alternative
+                </span>
+                <div class="ext-alt-card">
+                    <div>
+                        <h5 style="font-size:12px; font-weight:700; margin:0;">Bose QuietComfort 45</h5>
+                        <span style="font-size:10px; color:var(--text-muted);">Available on Flipkart</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <strong style="font-size:13px; color:var(--secondary);">₹17,999</strong>
+                        <button class="btn primary-outline btn-xs" onclick="extSwitchProduct()" style="padding:4px 8px; font-size:9px; border-radius:4px; margin-top:4px; display:block;">Compare</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Initialization Scripts -->
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
+    <script src="static/script.js?v=2.1"></script>
+</body>
+</html>

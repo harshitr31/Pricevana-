@@ -1,0 +1,10 @@
+flask
+flask-cors
+selenium
+webdriver-manager
+beautifulsoup4
+numpy
+pandas
+scikit-learn
+gunicorn
+requests
