@@ -101,4 +101,4 @@ Live : https://pricevana.onrender.com
 
 ---
 
-Created with ❤️ for Pricevana by Deepanshu.
+Modified by Harshit.
