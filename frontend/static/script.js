@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // ------------------ API CONFIG ------------------
-    const API_BASE = (window.location.protocol === 'file:' || (window.location.port !== '5000' && window.location.port !== ''))
-        ? 'http://127.0.0.1:5000'
-        : '';
+    const API_BASE = "https://pricevana-qpbs.onrender.com";
 
     // ------------------ DOM ELEMENTS ------------------
     const urlInput = document.getElementById('productUrl');
